@@ -316,6 +316,19 @@ private:
 
                 return false;
             }
+            case KNIGHT: {
+                if (piece.y == cursor.y - 2 && piece.x == cursor.x - 1) { return true; }
+                if (piece.y == cursor.y + 2 && piece.x == cursor.x - 1) { return true; }
+                if (piece.y == cursor.y - 2 && piece.x == cursor.x + 1) { return true; }
+                if (piece.y == cursor.y + 2 && piece.x == cursor.x + 1) { return true; }
+
+                if (piece.y == cursor.y - 1 && piece.x == cursor.x - 2) { return true; }
+                if (piece.y == cursor.y + 1 && piece.x == cursor.x - 2) { return true; }
+                if (piece.y == cursor.y - 1 && piece.x == cursor.x + 2) { return true; }
+                if (piece.y == cursor.y + 1 && piece.x == cursor.x + 2) { return true; }
+
+                return false;
+            }
             default: {
                 for (;;);
             }
