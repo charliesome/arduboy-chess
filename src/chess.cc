@@ -135,10 +135,11 @@ private:
 
         if (buttons.justPressed(A_BUTTON)) {
             if (piece) {
-                if (can_move()) {
+                if (is_valid_move()) {
                     board[cursor.y][cursor.x] = board[piece.y][piece.x];
                     board[piece.y][piece.x] = Piece();
                     piece = Coords();
+                    next_player();
                 }
             } else {
                 if (board[cursor.y][cursor.x].color() == current_player) {
@@ -155,9 +156,34 @@ private:
         }
     }
 
+    void next_player() {
+        int y_begin, y_scale;
+
+        if (current_player == WHITE) {
+            current_player = BLACK;
+            y_begin = 0;
+            y_scale = 1;
+        } else {
+            current_player = WHITE;
+            y_begin = 7;
+            y_scale = -1;
+        }
+
+        for (int i = 0; i < 8; i++) {
+            int y = y_begin + i * y_scale;
+            for (int x = 0; x < 8; x++) {
+                Piece& piece = board[y][x];
+                if (piece && piece.color() == current_player) {
+                    cursor = Coords(x, y);
+                    return;
+                }
+            }
+        }
+    }
+
     void render() {
-        for (size_t y = 0; y < 8; y++) {
-            for (size_t x = 0; x < 8; x++) {
+        for (int y = 0; y < 8; y++) {
+            for (int x = 0; x < 8; x++) {
                 draw_square(x, y, board[y][x]);
             }
         }
@@ -207,7 +233,7 @@ private:
         arduboy.drawBitmap(x, y, RANK_SPRITES[piece.rank()], 8, 8, piece.color());
     }
 
-    bool can_move() {
+    bool is_valid_move() {
         Piece moving = board[piece.y][piece.x];
         Piece target = board[cursor.y][cursor.x];
 
@@ -303,6 +329,8 @@ private:
                 int dist_y = abs(cursor.y - piece.y);
 
                 return dist_x <= 1 && dist_y <= 1;
+
+                // TODO implement castling
             }
         }
 
