@@ -347,7 +347,7 @@ private:
     void render() {
         for (int y = 0; y < 8; y++) {
             for (int x = 0; x < 8; x++) {
-                draw_square(x, y, board.square(Coords(x, y)));
+                draw_square(x, y);
             }
         }
 
@@ -367,7 +367,9 @@ private:
         }
     }
 
-    void draw_square(int square_x, int square_y, Piece piece) {
+    void draw_square(int square_x, int square_y) {
+        Piece square_piece = board.square(Coords(square_x, square_y));
+
         int x = square_x * 8 + 32;
         int y = square_y * 8;
 
@@ -380,20 +382,22 @@ private:
             { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff },
         };
 
-        // draw square
-        int square_sprite_idx = ~(square_x ^ square_y) & 1;
-        arduboy.drawBitmap(x, y, SQUARE_SPRITES[square_sprite_idx], 8, 8, 1);
+        // draw square only if no piece is currently selected, or the square is a valid move target
+        if (!piece || board.is_valid_move(piece, Coords(square_x, square_y))) {
+            int square_sprite_idx = ~(square_x ^ square_y) & 1;
+            arduboy.drawBitmap(x, y, SQUARE_SPRITES[square_sprite_idx], 8, 8, 1);
+        }
 
         // draw outline in reverse colour
-        const uint8_t* sprite = RANK_SPRITES[piece.rank()];
+        const uint8_t* sprite = RANK_SPRITES[square_piece.rank()];
         for (int y_off = -1; y_off <= 1; y_off++) {
             for (int x_off = -1; x_off <= 1; x_off++) {
-                arduboy.drawBitmap(x + x_off, y + y_off, sprite, 8, 8, !piece.color());
+                arduboy.drawBitmap(x + x_off, y + y_off, sprite, 8, 8, !square_piece.color());
             }
         }
 
         // draw sprite in piece colour
-        arduboy.drawBitmap(x, y, RANK_SPRITES[piece.rank()], 8, 8, piece.color());
+        arduboy.drawBitmap(x, y, RANK_SPRITES[square_piece.rank()], 8, 8, square_piece.color());
     }
 };
 
