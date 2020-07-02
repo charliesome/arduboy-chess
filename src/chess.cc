@@ -439,7 +439,7 @@ private:
     void render() {
         for (int y = 0; y < 8; y++) {
             for (int x = 0; x < 8; x++) {
-                draw_square(x, y);
+                draw_square(Coords(x, y));
             }
         }
 
@@ -501,24 +501,22 @@ private:
         }
     }
 
-    void draw_square(int square_x, int square_y) {
-        Piece piece = board.square(Coords(square_x, square_y));
+    void draw_square(Coords square) {
+        Piece piece = board.square(square);
 
-        int x = square_x * 8 + 32;
-        int y = square_y * 8;
+        int x = square.x * 8 + 32;
+        int y = square.y * 8;
 
         static const uint8_t PROGMEM SQUARE_SPRITES[3][8] = {
             // black:
             { 0x00, 0xaa, 0x00, 0xaa, 0x00, 0xaa, 0x00, 0xaa },
             // white:
             { 0x55, 0xaa, 0x55, 0xaa, 0x55, 0xaa, 0x55, 0xaa },
-            // selected:
-            { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff },
         };
 
         // draw square only if there is no selection, or this square is a valid move target
-        if (!selected || board.is_valid_turn(selected, Coords(square_x, square_y), current_player)) {
-            int square_sprite_idx = ~(square_x ^ square_y) & 1;
+        if (!selected || board.is_valid_turn(selected, square, current_player)) {
+            int square_sprite_idx = ~(square.x ^ square.y) & 1;
             arduboy.drawBitmap(x, y, SQUARE_SPRITES[square_sprite_idx], 8, 8, 1);
         }
 
