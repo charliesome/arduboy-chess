@@ -223,7 +223,42 @@ public:
         return true;
     }
 
+    bool is_check(color_t player_in_check) {
+        Coords king = find_king(player_in_check);
+
+        for (int y = 0; y < 8; y++) {
+            for (int x = 0; x < 8; x++) {
+                Coords coords = Coords(x, y);
+                Piece piece = square(coords);
+
+                if (piece.color() != player_in_check) {
+                    if (is_valid_move(coords, king)) {
+                        // check detected
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
 private:
+    Coords find_king(color_t player) {
+        for (int y = 0; y < 8; y++) {
+            for (int x = 0; x < 8; x++) {
+                Coords coords = Coords(x, y);
+                Piece piece = square(coords);
+
+                if (piece.color() == player && piece.rank() == KING) {
+                    return coords;
+                }
+            }
+        }
+
+        // TOOD shouldn't happen, we need a panic function
+    }
+
     bool is_valid_cardinal_move(Coords moving_coords, Coords target_coords) {
         int dist_x = abs(target_coords.x - moving_coords.x);
         int dist_y = abs(target_coords.y - moving_coords.y);
