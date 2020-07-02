@@ -157,6 +157,34 @@ public:
         return false;
     }
 
+    // assumes that we're already in check:
+    bool is_checkmate(color_t player_in_check) const {
+        for (int py = 0; py < 8; py++) {
+            for (int px = 0; px < 8; px++) {
+                Coords piece_coords = Coords(px, py);
+                Piece piece = square(piece_coords);
+
+                if (!piece || piece.color() != player_in_check) {
+                    // not our piece, not eligible for moving
+                    continue;
+                }
+
+                for (int ty = 0; ty < 8; ty++) {
+                    for (int tx = 0; tx < 8; tx++) {
+                        Coords target = Coords(tx, ty);
+
+                        if (is_valid_turn(piece_coords, target, player_in_check)) {
+                            // if there is at least one way out of our pickle, it's not checkmate
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+
+        return true;
+    }
+
 private:
     bool is_valid_move(Coords moving_coords, Coords target_coords) const {
         if (moving_coords == target_coords) {
@@ -415,6 +443,30 @@ private:
             }
         }
 
+        bool in_check = board.is_check(current_player);
+
+        if (in_check) {
+            if (board.is_checkmate(current_player)) {
+                int w = 72;
+                int h = 28;
+                int x = (128 - w) / 2;
+                int y = (64 - h) / 2;
+
+                // show game over modal
+                arduboy.drawRect(x - 1, y - 1, w + 2, h + 2, WHITE);
+                arduboy.fillRect(x, y, w, h, BLACK);
+                arduboy.setCursor(x + 7, y + 4);
+                arduboy.print("Checkmate!");
+                arduboy.setCursor(x + 7, y + 16);
+                if (current_player == WHITE) {
+                    arduboy.print("Black wins");
+                } else {
+                    arduboy.print("White wins");
+                }
+                return;
+            }
+        }
+
         // draw selection
         if (cursor) {
             if (selected) {
@@ -434,7 +486,7 @@ private:
             arduboy.setCursor(0, 64 - 8);
             arduboy.print("White");
 
-            if (board.is_check(WHITE)) {
+            if (in_check) {
                 arduboy.setCursor(0, 64 - 16);
                 arduboy.print("CHECK");
             }
@@ -442,7 +494,7 @@ private:
             arduboy.setCursor(0, 0);
             arduboy.print("Black");
 
-            if (board.is_check(BLACK)) {
+            if (in_check) {
                 arduboy.setCursor(0, 8);
                 arduboy.print("CHECK");
             }
