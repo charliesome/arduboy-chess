@@ -1,0 +1,30 @@
+#!/usr/bin/env ruby
+require "chunky_png"
+
+png = ChunkyPNG::Image.from_file(ARGV.fetch(0))
+
+if (png.height % 8) != 0
+  abort "png height not multiple of 8!"
+end
+
+WHITE = 0xffffffff
+BLACK = 0x222222ff
+
+print "static const uint8_t PROGMEM SPRITE[] = { "
+
+for y in 0...(png.height / 8)
+  for x in 0...png.width
+    byte = 0
+    for i in 0...8
+      case png[x, y * 8 + i]
+      when WHITE then byte |= (1 << i)
+      when BLACK then # pass
+      else abort "unknown colour at (#{x}, #{y})"
+      end
+    end
+
+    printf "0x%02x, ", byte
+  end
+end
+
+puts "};"
