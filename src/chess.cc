@@ -183,8 +183,13 @@ private:
                 // pawn can move two steps on first move:
                 if (moving.color() == WHITE) {
                     if (moving_coords.y == 6 && target_coords.y == 4 && moving_coords.x == target_coords.x) {
-                        // only if spot immediately in front is not occupied:
+                        // only if both spots are not occupied
+
                         if (square(Coords(target_coords.x, 5))) {
+                            return false;
+                        }
+
+                        if (square(Coords(target_coords.x, 4))) {
                             return false;
                         }
 
@@ -192,8 +197,13 @@ private:
                     }
                 } else {
                     if (moving_coords.y == 1 && target_coords.y == 3 && moving_coords.x == target_coords.x) {
-                        // ditto:
+                        // ditto
+
                         if (square(Coords(target_coords.x, 2))) {
+                            return false;
+                        }
+
+                        if (square(Coords(target_coords.x, 3))) {
                             return false;
                         }
 
