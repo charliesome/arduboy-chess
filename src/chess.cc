@@ -1,6 +1,7 @@
 #include <Arduboy.h>
 #include "lib/ArduboyExtra/simple_buttons.h"
 #include "chess.hh"
+#include "util.hh"
 
 Arduboy arduboy;
 SimpleButtons buttons (arduboy);
@@ -276,45 +277,7 @@ private:
                 // TODO implement promotion
             }
             case ROOK: {
-                // rook can move vertically if nothing's in the way
-                if (piece.x == cursor.x) {
-                    if (piece.y > cursor.y) {
-                        for (int y = cursor.y + 1; y < piece.y; y++) {
-                            if (board[y][cursor.x]) {
-                                return false;
-                            }
-                        }
-                        return true;
-                    } else {
-                        for (int y = piece.y + 1; y < cursor.y; y++) {
-                            if (board[y][cursor.x]) {
-                                return false;
-                            }
-                        }
-                        return true;
-                    }
-                }
-
-                // or horizontally
-                if (piece.y == cursor.y) {
-                    if (piece.x > cursor.x) {
-                        for (int x = cursor.x + 1; x < piece.x; x++) {
-                            if (board[cursor.y][x]) {
-                                return false;
-                            }
-                        }
-                        return true;
-                    } else {
-                        for (int x = piece.x + 1; x < cursor.x; x++) {
-                            if (board[cursor.y][x]) {
-                                return false;
-                            }
-                        }
-                        return true;
-                    }
-                }
-
-                return false;
+                return is_valid_cardinal_move();
             }
             case KNIGHT: {
                 if (piece.y == cursor.y - 2 && piece.x == cursor.x - 1) { return true; }
@@ -329,8 +292,61 @@ private:
 
                 return false;
             }
-            default: {
-                for (;;);
+            case BISHOP: {
+                return is_valid_diagonal_move();
+            }
+            case QUEEN: {
+                return is_valid_cardinal_move() || is_valid_diagonal_move();
+            }
+            case KING: {
+                int dist_x = abs(cursor.x - piece.x);
+                int dist_y = abs(cursor.y - piece.y);
+
+                return dist_x <= 1 && dist_y <= 1;
+            }
+        }
+
+        return true;
+    }
+
+    bool is_valid_cardinal_move() {
+        int dist_x = abs(cursor.x - piece.x);
+        int dist_y = abs(cursor.y - piece.y);
+
+        // make sure movement only occurs along one axis
+        if (dist_x != 0 && dist_y != 0) {
+            return false;
+        }
+
+        int scale_x = signum(cursor.x - piece.x);
+        int scale_y = signum(cursor.y - piece.y);
+
+        int dist = max(dist_x, dist_y);
+
+        for (int i = 1; i < dist; i++) {
+            if (board[piece.y + i * scale_y][piece.x + i * scale_x]) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    bool is_valid_diagonal_move() {
+        int dist_x = abs(cursor.x - piece.x);
+        int dist_y = abs(cursor.y - piece.y);
+
+        // make sure movement is diagonal
+        if (dist_x != dist_y) {
+            return false;
+        }
+
+        int scale_x = signum(cursor.x - piece.x);
+        int scale_y = signum(cursor.y - piece.y);
+
+        for (int i = 1; i < dist_x; i++) {
+            if (board[piece.y + i * scale_y][piece.x + i * scale_x]) {
+                return false;
             }
         }
 
