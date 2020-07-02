@@ -145,7 +145,7 @@ public:
                 Coords coords = Coords(x, y);
                 Piece piece = square(coords);
 
-                if (piece.color() != player_in_check) {
+                if (piece && piece.color() != player_in_check) {
                     if (is_valid_move(coords, king)) {
                         // check detected
                         return true;
