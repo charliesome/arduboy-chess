@@ -85,7 +85,11 @@ public:
     Piece() : packed(0) {}
 
     Piece(color_t color, rank_t rank)
-        : packed(((color & 1) << 7) | (rank & 7))
+        : Piece(color, rank, false)
+    {}
+
+    Piece(color_t color, rank_t rank, bool moved)
+        : packed(((color & 1) << 7) | (moved << 6)| (rank & 7))
     {}
 
     operator bool() const {
@@ -98,6 +102,14 @@ public:
 
     rank_t rank() const {
         return (rank_t)(packed & 7);
+    }
+
+    bool has_moved() const {
+        return (bool)((packed >> 6) & 1);
+    }
+
+    Piece move() const {
+        return Piece(color(), rank(), true);
     }
 };
 
@@ -124,7 +136,7 @@ public:
 
     Board move(Coords from, Coords to) const {
         Board new_ = *this;
-        new_.squares[to.y][to.x] = new_.squares[from.y][from.x];
+        new_.squares[to.y][to.x] = new_.squares[from.y][from.x].move();
         new_.squares[from.y][from.x] = Piece();
         return new_;
     }
