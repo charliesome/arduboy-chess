@@ -153,17 +153,15 @@ public:
         return true;
     }
 
-    bool is_check(color_t player_in_check) const {
-        Coords king = find_king(player_in_check);
-
+    bool is_under_attack(color_t player_under_attack, Coords target) const {
         for (int y = 0; y < 8; y++) {
             for (int x = 0; x < 8; x++) {
                 Coords coords = Coords(x, y);
                 Piece piece = square(coords);
 
-                if (piece && piece.color() != player_in_check) {
-                    if (is_valid_move(coords, king)) {
-                        // check detected
+                if (piece && piece.color() != player_under_attack) {
+                    if (is_valid_move(coords, target)) {
+                        // valid move to this square means it's under attack
                         return true;
                     }
                 }
@@ -171,6 +169,11 @@ public:
         }
 
         return false;
+    }
+
+    bool is_check(color_t player_in_check) const {
+        Coords king = find_king(player_in_check);
+        return is_under_attack(player_in_check, king);
     }
 
     // assumes that we're already in check:
