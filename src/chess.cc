@@ -125,6 +125,39 @@ public:
         return new_;
     }
 
+    bool is_valid_turn(Coords moving_coords, Coords target_coords, color_t player) const {
+        if (!is_valid_move(moving_coords, target_coords)) {
+            return false;
+        }
+
+        if (move(moving_coords, target_coords).is_check(player)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    bool is_check(color_t player_in_check) const {
+        Coords king = find_king(player_in_check);
+
+        for (int y = 0; y < 8; y++) {
+            for (int x = 0; x < 8; x++) {
+                Coords coords = Coords(x, y);
+                Piece piece = square(coords);
+
+                if (piece.color() != player_in_check) {
+                    if (is_valid_move(coords, king)) {
+                        // check detected
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+private:
     bool is_valid_move(Coords moving_coords, Coords target_coords) const {
         if (moving_coords == target_coords) {
             return false;
@@ -161,7 +194,6 @@ public:
                     if (moving_coords.y == 1 && target_coords.y == 3 && moving_coords.x == target_coords.x) {
                         // ditto:
                         if (square(Coords(target_coords.x, 2))) {
-
                             return false;
                         }
 
@@ -230,27 +262,6 @@ public:
         return true;
     }
 
-    bool is_check(color_t player_in_check) const {
-        Coords king = find_king(player_in_check);
-
-        for (int y = 0; y < 8; y++) {
-            for (int x = 0; x < 8; x++) {
-                Coords coords = Coords(x, y);
-                Piece piece = square(coords);
-
-                if (piece.color() != player_in_check) {
-                    if (is_valid_move(coords, king)) {
-                        // check detected
-                        return true;
-                    }
-                }
-            }
-        }
-
-        return false;
-    }
-
-private:
     Coords find_king(color_t player) const {
         for (int y = 0; y < 8; y++) {
             for (int x = 0; x < 8; x++) {
@@ -264,6 +275,7 @@ private:
         }
 
         // TOOD shouldn't happen, we need a panic function
+        for (;;) ;
     }
 
     bool is_valid_cardinal_move(Coords moving_coords, Coords target_coords) const {
@@ -340,7 +352,7 @@ private:
 
         if (buttons.justPressed(A_BUTTON)) {
             if (selected) {
-                if (board.is_valid_move(selected, cursor)) {
+                if (board.is_valid_turn(selected, cursor, current_player)) {
                     Board new_board = board.move(selected, cursor);
                     board = new_board;
                     selected = Coords();
@@ -407,6 +419,24 @@ private:
                 arduboy.drawRect(x - 1, y - 1, 10, 10, frame_count);
             }
         }
+
+        if (current_player == WHITE) {
+            arduboy.setCursor(0, 64 - 8);
+            arduboy.print("White");
+
+            if (board.is_check(WHITE)) {
+                arduboy.setCursor(0, 64 - 16);
+                arduboy.print("CHECK");
+            }
+        } else {
+            arduboy.setCursor(0, 0);
+            arduboy.print("Black");
+
+            if (board.is_check(BLACK)) {
+                arduboy.setCursor(0, 8);
+                arduboy.print("CHECK");
+            }
+        }
     }
 
     void draw_square(int square_x, int square_y) {
@@ -425,7 +455,7 @@ private:
         };
 
         // draw square only if there is no selection, or this square is a valid move target
-        if (!selected || board.is_valid_move(selected, Coords(square_x, square_y))) {
+        if (!selected || board.is_valid_turn(selected, Coords(square_x, square_y), current_player)) {
             int square_sprite_idx = ~(square_x ^ square_y) & 1;
             arduboy.drawBitmap(x, y, SQUARE_SPRITES[square_sprite_idx], 8, 8, 1);
         }
