@@ -36,7 +36,7 @@ struct Coords {
     Coords() : x(-1), y(-1) {}
     Coords(int x, int y) : x(x), y(y) {}
 
-    operator bool() {
+    operator bool() const {
         return x >= 0 && y >= 0;
     }
 
@@ -84,15 +84,15 @@ public:
         : packed(((color & 1) << 7) | (rank & 7))
     {}
 
-    operator bool() {
+    operator bool() const {
         return packed != 0;
     }
 
-    color_t color() {
+    color_t color() const {
         return (color_t)(packed >> 7);
     }
 
-    rank_t rank() {
+    rank_t rank() const {
         return (rank_t)(packed & 7);
     }
 };
@@ -114,11 +114,18 @@ public:
         })
     {}
 
-    Piece& square(Coords coords) {
+    const Piece& square(Coords coords) const {
         return squares[coords.y][coords.x];
     }
 
-    bool is_valid_move(Coords moving_coords, Coords target_coords) {
+    Board move(Coords from, Coords to) const {
+        Board new_ = *this;
+        new_.squares[to.y][to.x] = new_.squares[from.y][from.x];
+        new_.squares[from.y][from.x] = Piece();
+        return new_;
+    }
+
+    bool is_valid_move(Coords moving_coords, Coords target_coords) const {
         if (moving_coords == target_coords) {
             return false;
         }
@@ -223,7 +230,7 @@ public:
         return true;
     }
 
-    bool is_check(color_t player_in_check) {
+    bool is_check(color_t player_in_check) const {
         Coords king = find_king(player_in_check);
 
         for (int y = 0; y < 8; y++) {
@@ -244,7 +251,7 @@ public:
     }
 
 private:
-    Coords find_king(color_t player) {
+    Coords find_king(color_t player) const {
         for (int y = 0; y < 8; y++) {
             for (int x = 0; x < 8; x++) {
                 Coords coords = Coords(x, y);
@@ -259,7 +266,7 @@ private:
         // TOOD shouldn't happen, we need a panic function
     }
 
-    bool is_valid_cardinal_move(Coords moving_coords, Coords target_coords) {
+    bool is_valid_cardinal_move(Coords moving_coords, Coords target_coords) const {
         int dist_x = abs(target_coords.x - moving_coords.x);
         int dist_y = abs(target_coords.y - moving_coords.y);
 
@@ -283,7 +290,7 @@ private:
         return true;
     }
 
-    bool is_valid_diagonal_move(Coords moving_coords, Coords target_coords) {
+    bool is_valid_diagonal_move(Coords moving_coords, Coords target_coords) const {
         int dist_x = abs(target_coords.x - moving_coords.x);
         int dist_y = abs(target_coords.y - moving_coords.y);
 
@@ -334,8 +341,8 @@ private:
         if (buttons.justPressed(A_BUTTON)) {
             if (selected) {
                 if (board.is_valid_move(selected, cursor)) {
-                    board.square(cursor) = board.square(selected);
-                    board.square(selected) = Piece();
+                    Board new_board = board.move(selected, cursor);
+                    board = new_board;
                     selected = Coords();
                     next_player();
                 }
@@ -370,7 +377,7 @@ private:
         for (int i = 0; i < 8; i++) {
             int y = y_begin + i * y_scale;
             for (int x = 0; x < 8; x++) {
-                Piece& piece = board.square(Coords(x, y));
+                const Piece& piece = board.square(Coords(x, y));
                 if (piece && piece.color() == current_player) {
                     cursor = Coords(x, y);
                     return;
