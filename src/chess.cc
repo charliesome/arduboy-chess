@@ -117,6 +117,158 @@ public:
     Piece& square(Coords coords) {
         return squares[coords.y][coords.x];
     }
+
+    bool is_valid_move(Coords moving_coords, Coords target_coords) {
+        if (moving_coords == target_coords) {
+            return false;
+        }
+
+        Piece moving = square(moving_coords);
+        Piece target = square(target_coords);
+
+        if (!moving) {
+            return false;
+        }
+
+        if (target && moving.color() == target.color()) {
+            return false;
+        }
+
+        switch (moving.rank()) {
+            case NONE: {
+                // shouldn't ever happen
+                return false;
+            }
+            case PAWN: {
+                // pawn can move two steps on first move:
+                if (moving.color() == WHITE) {
+                    if (moving_coords.y == 6 && target_coords.y == 4 && moving_coords.x == target_coords.x) {
+                        // only if spot immediately in front is not occupied:
+                        if (square(Coords(target_coords.x, 5))) {
+                            return false;
+                        }
+
+                        return true;
+                    }
+                } else {
+                    if (moving_coords.y == 1 && target_coords.y == 3 && moving_coords.x == target_coords.x) {
+                        // ditto:
+                        if (square(Coords(target_coords.x, 2))) {
+
+                            return false;
+                        }
+
+                        return true;
+                    }
+                }
+
+                // pawn may only ever move forward otherwise:
+                if (moving.color() == WHITE) {
+                    if (moving_coords.y - 1 != target_coords.y) {
+                        return false;
+                    }
+                } else {
+                    if (moving_coords.y + 1 != target_coords.y) {
+                        return false;
+                    }
+                }
+
+                // pawn can move directly forward only if not attacking:
+                if (moving_coords.x == target_coords.x && !target) {
+                    return true;
+                }
+
+                // pawn can attack diagonally
+                if ((moving_coords.x - 1 == target_coords.x || moving_coords.x + 1 == target_coords.x) && target) {
+                    return true;
+                }
+
+                // no other moves are permitted:
+                return false;
+
+                // TODO implement promotion
+            }
+            case ROOK: {
+                return is_valid_cardinal_move(moving_coords, target_coords);
+            }
+            case KNIGHT: {
+                if (moving_coords.y == target_coords.y - 2 && moving_coords.x == target_coords.x - 1) { return true; }
+                if (moving_coords.y == target_coords.y + 2 && moving_coords.x == target_coords.x - 1) { return true; }
+                if (moving_coords.y == target_coords.y - 2 && moving_coords.x == target_coords.x + 1) { return true; }
+                if (moving_coords.y == target_coords.y + 2 && moving_coords.x == target_coords.x + 1) { return true; }
+
+                if (moving_coords.y == target_coords.y - 1 && moving_coords.x == target_coords.x - 2) { return true; }
+                if (moving_coords.y == target_coords.y + 1 && moving_coords.x == target_coords.x - 2) { return true; }
+                if (moving_coords.y == target_coords.y - 1 && moving_coords.x == target_coords.x + 2) { return true; }
+                if (moving_coords.y == target_coords.y + 1 && moving_coords.x == target_coords.x + 2) { return true; }
+
+                return false;
+            }
+            case BISHOP: {
+                return is_valid_diagonal_move(moving_coords, target_coords);
+            }
+            case QUEEN: {
+                return is_valid_cardinal_move(moving_coords, target_coords) || is_valid_diagonal_move(moving_coords, target_coords);
+            }
+            case KING: {
+                int dist_x = abs(target_coords.x - moving_coords.x);
+                int dist_y = abs(target_coords.y - moving_coords.y);
+
+                return dist_x <= 1 && dist_y <= 1;
+
+                // TODO implement castling
+            }
+        }
+
+        return true;
+    }
+
+private:
+    bool is_valid_cardinal_move(Coords moving_coords, Coords target_coords) {
+        int dist_x = abs(target_coords.x - moving_coords.x);
+        int dist_y = abs(target_coords.y - moving_coords.y);
+
+        // make sure movement only occurs along one axis
+        if (dist_x != 0 && dist_y != 0) {
+            return false;
+        }
+
+        int scale_x = signum(target_coords.x - moving_coords.x);
+        int scale_y = signum(target_coords.y - moving_coords.y);
+
+        int dist = max(dist_x, dist_y);
+
+        for (int i = 1; i < dist; i++) {
+            Coords intermediate = Coords(moving_coords.x + i * scale_x, moving_coords.y + i * scale_y);
+            if (square(intermediate)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    bool is_valid_diagonal_move(Coords moving_coords, Coords target_coords) {
+        int dist_x = abs(target_coords.x - moving_coords.x);
+        int dist_y = abs(target_coords.y - moving_coords.y);
+
+        // make sure movement is diagonal
+        if (dist_x != dist_y) {
+            return false;
+        }
+
+        int scale_x = signum(target_coords.x - moving_coords.x);
+        int scale_y = signum(target_coords.y - moving_coords.y);
+
+        for (int i = 1; i < dist_x; i++) {
+            Coords intermediate = Coords(moving_coords.x + i * scale_x, moving_coords.y + i * scale_y);
+            if (square(intermediate)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
 };
 
 class Chess {
@@ -146,7 +298,7 @@ private:
 
         if (buttons.justPressed(A_BUTTON)) {
             if (piece) {
-                if (is_valid_move()) {
+                if (board.is_valid_move(piece, cursor)) {
                     board.square(cursor) = board.square(piece);
                     board.square(piece) = Piece();
                     piece = Coords();
@@ -242,157 +394,6 @@ private:
 
         // draw sprite in piece colour
         arduboy.drawBitmap(x, y, RANK_SPRITES[piece.rank()], 8, 8, piece.color());
-    }
-
-    bool is_valid_move() {
-        Piece moving = board.square(piece);
-        Piece target = board.square(cursor);
-
-        if (!moving) {
-            return false;
-        }
-
-        if (target && moving.color() == target.color()) {
-            return false;
-        }
-
-        if (piece == cursor) {
-            return false;
-        }
-
-        switch (moving.rank()) {
-            case NONE: {
-                // shouldn't ever happen
-                return false;
-            }
-            case PAWN: {
-                // pawn can move two steps on first move:
-                if (moving.color() == WHITE) {
-                    if (piece.y == 6 && cursor.y == 4 && piece.x == cursor.x) {
-                        // only if spot immediately in front is not occupied:
-                        if (board.square(Coords(cursor.x, 5))) {
-                            return false;
-                        }
-
-                        return true;
-                    }
-                } else {
-                    if (piece.y == 1 && cursor.y == 3 && piece.x == cursor.x) {
-                        // ditto:
-                        if (board.square(Coords(cursor.x, 2))) {
-
-                            return false;
-                        }
-
-                        return true;
-                    }
-                }
-
-                // pawn may only ever move forward otherwise:
-                if (moving.color() == WHITE) {
-                    if (piece.y - 1 != cursor.y) {
-                        return false;
-                    }
-                } else {
-                    if (piece.y + 1 != cursor.y) {
-                        return false;
-                    }
-                }
-
-                // pawn can move directly forward only if not attacking:
-                if (piece.x == cursor.x && !target) {
-                    return true;
-                }
-
-                // pawn can attack diagonally
-                if ((piece.x - 1 == cursor.x || piece.x + 1 == cursor.x) && target) {
-                    return true;
-                }
-
-                // no other moves are permitted:
-                return false;
-
-                // TODO implement promotion
-            }
-            case ROOK: {
-                return is_valid_cardinal_move();
-            }
-            case KNIGHT: {
-                if (piece.y == cursor.y - 2 && piece.x == cursor.x - 1) { return true; }
-                if (piece.y == cursor.y + 2 && piece.x == cursor.x - 1) { return true; }
-                if (piece.y == cursor.y - 2 && piece.x == cursor.x + 1) { return true; }
-                if (piece.y == cursor.y + 2 && piece.x == cursor.x + 1) { return true; }
-
-                if (piece.y == cursor.y - 1 && piece.x == cursor.x - 2) { return true; }
-                if (piece.y == cursor.y + 1 && piece.x == cursor.x - 2) { return true; }
-                if (piece.y == cursor.y - 1 && piece.x == cursor.x + 2) { return true; }
-                if (piece.y == cursor.y + 1 && piece.x == cursor.x + 2) { return true; }
-
-                return false;
-            }
-            case BISHOP: {
-                return is_valid_diagonal_move();
-            }
-            case QUEEN: {
-                return is_valid_cardinal_move() || is_valid_diagonal_move();
-            }
-            case KING: {
-                int dist_x = abs(cursor.x - piece.x);
-                int dist_y = abs(cursor.y - piece.y);
-
-                return dist_x <= 1 && dist_y <= 1;
-
-                // TODO implement castling
-            }
-        }
-
-        return true;
-    }
-
-    bool is_valid_cardinal_move() {
-        int dist_x = abs(cursor.x - piece.x);
-        int dist_y = abs(cursor.y - piece.y);
-
-        // make sure movement only occurs along one axis
-        if (dist_x != 0 && dist_y != 0) {
-            return false;
-        }
-
-        int scale_x = signum(cursor.x - piece.x);
-        int scale_y = signum(cursor.y - piece.y);
-
-        int dist = max(dist_x, dist_y);
-
-        for (int i = 1; i < dist; i++) {
-            Coords intermediate = Coords(piece.x + i * scale_x, piece.y + i * scale_y);
-            if (board.square(intermediate)) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    bool is_valid_diagonal_move() {
-        int dist_x = abs(cursor.x - piece.x);
-        int dist_y = abs(cursor.y - piece.y);
-
-        // make sure movement is diagonal
-        if (dist_x != dist_y) {
-            return false;
-        }
-
-        int scale_x = signum(cursor.x - piece.x);
-        int scale_y = signum(cursor.y - piece.y);
-
-        for (int i = 1; i < dist_x; i++) {
-            Coords intermediate = Coords(piece.x + i * scale_x, piece.y + i * scale_y);
-            if (board.square(intermediate)) {
-                return false;
-            }
-        }
-
-        return true;
     }
 };
 
