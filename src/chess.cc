@@ -274,7 +274,7 @@ private:
 class Chess {
     Board board;
     Coords cursor;
-    Coords piece;
+    Coords selected;
     bool frame_count;
     color_t current_player;
 
@@ -297,24 +297,24 @@ private:
         cursor.receive_input();
 
         if (buttons.justPressed(A_BUTTON)) {
-            if (piece) {
-                if (board.is_valid_move(piece, cursor)) {
-                    board.square(cursor) = board.square(piece);
-                    board.square(piece) = Piece();
-                    piece = Coords();
+            if (selected) {
+                if (board.is_valid_move(selected, cursor)) {
+                    board.square(cursor) = board.square(selected);
+                    board.square(selected) = Piece();
+                    selected = Coords();
                     next_player();
                 }
             } else {
                 if (board.square(cursor).color() == current_player) {
-                    piece = cursor;
+                    selected = cursor;
                 }
             }
         }
 
-        if (piece) {
+        if (selected) {
             if (buttons.justPressed(B_BUTTON)) {
-                cursor = piece;
-                piece = Coords();
+                cursor = selected;
+                selected = Coords();
             }
         }
     }
@@ -353,13 +353,13 @@ private:
 
         // draw selection
         if (cursor) {
-            if (piece) {
-                int x = piece.x * 8 + 32;
-                int y = piece.y * 8;
+            if (selected) {
+                int x = selected.x * 8 + 32;
+                int y = selected.y * 8;
                 arduboy.drawRect(x - 1, y - 1, 10, 10, WHITE);
             }
 
-            if (piece != cursor) {
+            if (selected != cursor) {
                 int x = cursor.x * 8 + 32;
                 int y = cursor.y * 8;
                 arduboy.drawRect(x - 1, y - 1, 10, 10, frame_count);
@@ -368,7 +368,7 @@ private:
     }
 
     void draw_square(int square_x, int square_y) {
-        Piece square_piece = board.square(Coords(square_x, square_y));
+        Piece piece = board.square(Coords(square_x, square_y));
 
         int x = square_x * 8 + 32;
         int y = square_y * 8;
@@ -382,22 +382,22 @@ private:
             { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff },
         };
 
-        // draw square only if no piece is currently selected, or the square is a valid move target
-        if (!piece || board.is_valid_move(piece, Coords(square_x, square_y))) {
+        // draw square only if there is no selection, or this square is a valid move target
+        if (!selected || board.is_valid_move(selected, Coords(square_x, square_y))) {
             int square_sprite_idx = ~(square_x ^ square_y) & 1;
             arduboy.drawBitmap(x, y, SQUARE_SPRITES[square_sprite_idx], 8, 8, 1);
         }
 
         // draw outline in reverse colour
-        const uint8_t* sprite = RANK_SPRITES[square_piece.rank()];
+        const uint8_t* sprite = RANK_SPRITES[piece.rank()];
         for (int y_off = -1; y_off <= 1; y_off++) {
             for (int x_off = -1; x_off <= 1; x_off++) {
-                arduboy.drawBitmap(x + x_off, y + y_off, sprite, 8, 8, !square_piece.color());
+                arduboy.drawBitmap(x + x_off, y + y_off, sprite, 8, 8, !piece.color());
             }
         }
 
         // draw sprite in piece colour
-        arduboy.drawBitmap(x, y, RANK_SPRITES[square_piece.rank()], 8, 8, square_piece.color());
+        arduboy.drawBitmap(x, y, RANK_SPRITES[piece.rank()], 8, 8, piece.color());
     }
 };
 
