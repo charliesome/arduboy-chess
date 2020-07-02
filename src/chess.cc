@@ -97,8 +97,30 @@ public:
     }
 };
 
+class Board {
+    Piece squares[8][8];
+
+public:
+    Board()
+        : squares({
+            { Piece(BLACK, ROOK), Piece(BLACK, KNIGHT), Piece(BLACK, BISHOP), Piece(BLACK, QUEEN), Piece(BLACK, KING), Piece(BLACK, BISHOP), Piece(BLACK, KNIGHT), Piece(BLACK, ROOK) },
+            { Piece(BLACK, PAWN), Piece(BLACK, PAWN), Piece(BLACK, PAWN), Piece(BLACK, PAWN), Piece(BLACK, PAWN), Piece(BLACK, PAWN), Piece(BLACK, PAWN), Piece(BLACK, PAWN) },
+            { Piece(), Piece(), Piece(), Piece(), Piece(), Piece(), Piece(), Piece() },
+            { Piece(), Piece(), Piece(), Piece(), Piece(), Piece(), Piece(), Piece() },
+            { Piece(), Piece(), Piece(), Piece(), Piece(), Piece(), Piece(), Piece() },
+            { Piece(), Piece(), Piece(), Piece(), Piece(), Piece(), Piece(), Piece() },
+            { Piece(WHITE, PAWN), Piece(WHITE, PAWN), Piece(WHITE, PAWN), Piece(WHITE, PAWN), Piece(WHITE, PAWN), Piece(WHITE, PAWN), Piece(WHITE, PAWN), Piece(WHITE, PAWN) },
+            { Piece(WHITE, ROOK), Piece(WHITE, KNIGHT), Piece(WHITE, BISHOP), Piece(WHITE, QUEEN), Piece(WHITE, KING), Piece(WHITE, BISHOP), Piece(WHITE, KNIGHT), Piece(WHITE, ROOK) },
+        })
+    {}
+
+    Piece& square(Coords coords) {
+        return squares[coords.y][coords.x];
+    }
+};
+
 class Chess {
-    Piece board[8][8];
+    Board board;
     Coords cursor;
     Coords piece;
     bool frame_count;
@@ -106,18 +128,7 @@ class Chess {
 
 public:
     Chess()
-        : board({
-                { Piece(BLACK, ROOK), Piece(BLACK, KNIGHT), Piece(BLACK, BISHOP), Piece(BLACK, QUEEN), Piece(BLACK, KING), Piece(BLACK, BISHOP), Piece(BLACK, KNIGHT), Piece(BLACK, ROOK) },
-                { Piece(BLACK, PAWN), Piece(BLACK, PAWN), Piece(BLACK, PAWN), Piece(BLACK, PAWN), Piece(BLACK, PAWN), Piece(BLACK, PAWN), Piece(BLACK, PAWN), Piece(BLACK, PAWN) },
-                { Piece(), Piece(), Piece(), Piece(), Piece(), Piece(), Piece(), Piece() },
-                { Piece(), Piece(), Piece(), Piece(), Piece(), Piece(), Piece(), Piece() },
-                { Piece(), Piece(), Piece(), Piece(), Piece(), Piece(), Piece(), Piece() },
-                { Piece(), Piece(), Piece(), Piece(), Piece(), Piece(), Piece(), Piece() },
-                { Piece(WHITE, PAWN), Piece(WHITE, PAWN), Piece(WHITE, PAWN), Piece(WHITE, PAWN), Piece(WHITE, PAWN), Piece(WHITE, PAWN), Piece(WHITE, PAWN), Piece(WHITE, PAWN) },
-                { Piece(WHITE, ROOK), Piece(WHITE, KNIGHT), Piece(WHITE, BISHOP), Piece(WHITE, QUEEN), Piece(WHITE, KING), Piece(WHITE, BISHOP), Piece(WHITE, KNIGHT), Piece(WHITE, ROOK) },
-            })
-        // start cursor at white's first pawn:
-        , cursor(Coords(0, 6))
+        : cursor(Coords(0, 6))
         , frame_count(false)
         , current_player(WHITE)
     {
@@ -136,13 +147,13 @@ private:
         if (buttons.justPressed(A_BUTTON)) {
             if (piece) {
                 if (is_valid_move()) {
-                    board[cursor.y][cursor.x] = board[piece.y][piece.x];
-                    board[piece.y][piece.x] = Piece();
+                    board.square(cursor) = board.square(piece);
+                    board.square(piece) = Piece();
                     piece = Coords();
                     next_player();
                 }
             } else {
-                if (board[cursor.y][cursor.x].color() == current_player) {
+                if (board.square(cursor).color() == current_player) {
                     piece = cursor;
                 }
             }
@@ -172,7 +183,7 @@ private:
         for (int i = 0; i < 8; i++) {
             int y = y_begin + i * y_scale;
             for (int x = 0; x < 8; x++) {
-                Piece& piece = board[y][x];
+                Piece& piece = board.square(Coords(x, y));
                 if (piece && piece.color() == current_player) {
                     cursor = Coords(x, y);
                     return;
@@ -184,7 +195,7 @@ private:
     void render() {
         for (int y = 0; y < 8; y++) {
             for (int x = 0; x < 8; x++) {
-                draw_square(x, y, board[y][x]);
+                draw_square(x, y, board.square(Coords(x, y)));
             }
         }
 
@@ -234,8 +245,8 @@ private:
     }
 
     bool is_valid_move() {
-        Piece moving = board[piece.y][piece.x];
-        Piece target = board[cursor.y][cursor.x];
+        Piece moving = board.square(piece);
+        Piece target = board.square(cursor);
 
         if (!moving) {
             return false;
@@ -259,7 +270,7 @@ private:
                 if (moving.color() == WHITE) {
                     if (piece.y == 6 && cursor.y == 4 && piece.x == cursor.x) {
                         // only if spot immediately in front is not occupied:
-                        if (board[5][cursor.x]) {
+                        if (board.square(Coords(cursor.x, 5))) {
                             return false;
                         }
 
@@ -268,7 +279,8 @@ private:
                 } else {
                     if (piece.y == 1 && cursor.y == 3 && piece.x == cursor.x) {
                         // ditto:
-                        if (board[2][cursor.x]) {
+                        if (board.square(Coords(cursor.x, 2))) {
+
                             return false;
                         }
 
@@ -352,7 +364,8 @@ private:
         int dist = max(dist_x, dist_y);
 
         for (int i = 1; i < dist; i++) {
-            if (board[piece.y + i * scale_y][piece.x + i * scale_x]) {
+            Coords intermediate = Coords(piece.x + i * scale_x, piece.y + i * scale_y);
+            if (board.square(intermediate)) {
                 return false;
             }
         }
@@ -373,7 +386,8 @@ private:
         int scale_y = signum(cursor.y - piece.y);
 
         for (int i = 1; i < dist_x; i++) {
-            if (board[piece.y + i * scale_y][piece.x + i * scale_x]) {
+            Coords intermediate = Coords(piece.x + i * scale_x, piece.y + i * scale_y);
+            if (board.square(intermediate)) {
                 return false;
             }
         }
