@@ -33,35 +33,50 @@ static const uint8_t PROGMEM LOGO[] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
 // arduboy headers define WHITE and BLACK, so just use their definition to prevent cooked bugs
 typedef uint8_t color_t;
 
-struct Coords {
-    int x_;
-    int y_;
+class Coords {
+    uint8_t packed;
 
-    Coords() : x_(-1), y_(-1) {}
-    Coords(int x, int y) : x_(x), y_(y) {}
+public:
+    Coords() : packed(0xffu) {}
+    Coords(int x, int y) {
+        if (x < 0 || x > 7 || y < 0 || y > 7) {
+            // TODO need a panic fn
+            for (;;) ;
+        }
+
+        packed = ((uint8_t)x & 7) | (((uint8_t)y & 7) << 3);
+    }
 
     operator bool() const {
-        return x() >= 0 && y() >= 0;
+        return packed != 0xffu;
     }
 
     bool operator ==(const Coords& other) {
-        return x() == other.x() && y() == other.y();
+        return packed == other.packed;
     }
 
     bool operator !=(const Coords& other) {
-        return !(*this == other);
+        return packed != other.packed;
     }
 
     int x() const {
-        return x_;
+        return (int)(packed & 7);
     }
 
     int y() const {
-        return y_;
+        return (int)((packed >> 3) & 7);
     }
 
-    Coords translate(int x_, int y_) const {
-        return Coords(x() + x_, y() + y_);
+    Coords translate(int x_delta, int y_delta) const {
+        int x_ = x() + x_delta;
+        int y_ = y() + y_delta;
+
+        if (x_ < 0 || x_ > 7 || y_ < 0 || y_ > 7) {
+            // out of bounds, return null coord
+            return Coords();
+        } else {
+            return Coords(x_, y_);
+        }
     }
 };
 
@@ -466,6 +481,7 @@ class Chess {
 public:
     Chess()
         : cursor(Coords(0, 6))
+        , selected(Coords())
         , frame_count(false)
         , current_player(WHITE)
     {
