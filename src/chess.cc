@@ -135,8 +135,35 @@ public:
     }
 
     Board move(Coords from, Coords to) const {
+        Piece moving = squares[from.y][from.x];
+
+        // special castling logic
+        if (moving.rank() == KING && !moving.has_moved() && abs(to.x - from.x) == 2) {
+            // all validations are assumed handled, so we can get straight into the guts of the move:
+
+            int move_direction = signum(to.x - from.x);
+
+            if (move_direction > 0) {
+                // kingside
+                Board new_ = *this;
+                new_.squares[from.y][from.x + 1] = new_.squares[from.y][from.x + 3].move();
+                new_.squares[from.y][from.x + 2] = new_.squares[from.y][from.x].move();
+                new_.squares[from.y][from.x + 3] = Piece();
+                new_.squares[from.y][from.x] = Piece();
+                return new_;
+            } else {
+                // queenside
+                Board new_ = *this;
+                new_.squares[from.y][from.x - 1] = new_.squares[from.y][from.x - 4].move();
+                new_.squares[from.y][from.x - 2] = new_.squares[from.y][from.x].move();
+                new_.squares[from.y][from.x - 4] = Piece();
+                new_.squares[from.y][from.x] = Piece();
+                return new_;
+            }
+        }
+
         Board new_ = *this;
-        new_.squares[to.y][to.x] = new_.squares[from.y][from.x].move();
+        new_.squares[to.y][to.x] = moving.move();
         new_.squares[from.y][from.x] = Piece();
         return new_;
     }
@@ -310,9 +337,70 @@ private:
                 int dist_x = abs(target_coords.x - moving_coords.x);
                 int dist_y = abs(target_coords.y - moving_coords.y);
 
-                return dist_x <= 1 && dist_y <= 1;
+                if (dist_x == 2 && dist_y == 0) {
+                    // castling
 
-                // TODO implement castling
+                    if (moving.has_moved()) {
+                        // can only castle unmoved king
+                        return false;
+                    }
+
+                    if (target_coords.x > moving_coords.x) {
+                        // castling kingside
+
+                        Coords thru = Coords(moving_coords.x + 1, moving_coords.y);
+                        Coords into = Coords(moving_coords.x + 2, moving_coords.y);
+                        Coords rook = Coords(moving_coords.x + 3, moving_coords.y);
+
+                        if (square(thru) || square(into)) {
+                            // thru and into squares must be empty
+                            return false;
+                        }
+
+                        Piece rook_piece = square(rook);
+                        if (!rook_piece || rook_piece.rank() != ROOK || rook_piece.has_moved()) {
+                            // rook can't have moved
+                            return false;
+                        }
+
+                        if (is_under_attack(moving.color(), thru) || is_under_attack(moving.color(), into)) {
+                            // cannot move king through or into check
+                            return false;
+                        }
+
+                        return true;
+                    } else {
+                        // castling queenside
+
+                        Coords thru = Coords(moving_coords.x - 1, moving_coords.y);
+                        Coords into = Coords(moving_coords.x - 2, moving_coords.y);
+                        Coords xtra = Coords(moving_coords.x - 3, moving_coords.y);
+                        Coords rook = Coords(moving_coords.x - 4, moving_coords.y);
+
+                        if (square(thru) || square(into) || square(xtra)) {
+                            // all intermediate squares must be empty
+                            return false;
+                        }
+
+                        Piece rook_piece = square(rook);
+                        if (!rook_piece || rook_piece.rank() != ROOK || rook_piece.has_moved()) {
+                            // rook can't have moved
+                            return false;
+                        }
+
+                        if (is_under_attack(moving.color(), thru) || is_under_attack(moving.color(), into)) {
+                            // cannot move king through or into check
+                            return false;
+                        }
+
+                        return true;
+                    }
+                } else if (dist_x <= 1 && dist_y <= 1) {
+                    // normal move
+                    return true;
+                } else {
+                    return false;
+                }
             }
         }
 
