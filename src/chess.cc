@@ -18,6 +18,8 @@ typedef enum {
     KING    = 6,
 } rank_t;
 
+static const rank_t PROMOTION_CHOICES[] = { QUEEN, ROOK, BISHOP, KNIGHT };
+
 static const uint8_t PROGMEM RANK_SPRITES[7][8] = {
     /* none */      { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
     /* pawn */      { 0x00, 0x40, 0x60, 0x7e, 0x7e, 0x60, 0x40, 0x00 },
@@ -32,6 +34,7 @@ static const uint8_t PROGMEM LOGO[] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
 
 static void __attribute__((noreturn)) panic(const char* msg){
     arduboy.clear();
+    arduboy.setCursor(0, 0);
     arduboy.print("PANIC\n");
     arduboy.print(msg);
     arduboy.display();
@@ -141,6 +144,12 @@ public:
 
     Piece square(Coords coords) const {
         return squares[coords.y()][coords.x()];
+    }
+
+    Board set_square(Coords coords, Piece piece) const {
+        Board new_ = *this;
+        new_.squares[coords.y()][coords.x()] = piece;
+        return new_;
     }
 
     Board move(Coords from, Coords to) const {
@@ -482,6 +491,7 @@ typedef enum {
     SELECT,
     MOVE,
     CHECKMATE,
+    PROMOTE,
 } state_discriminant_t;
 
 typedef struct {
@@ -499,6 +509,11 @@ typedef struct {
         struct {
             color_t winner;
         } checkmate;
+        struct {
+            color_t player;
+            Coords piece;
+            uint8_t choice;
+        } promote;
     } as;
 } game_state_t;
 
@@ -530,6 +545,18 @@ static Coords move_cursor(Coords cursor) {
     return cursor;
 }
 
+static void draw_piece(int x, int y, rank_t rank, color_t color) {
+    const uint8_t* sprite = RANK_SPRITES[rank];
+
+    for (int y_off = -1; y_off <= 1; y_off++) {
+        for (int x_off = -1; x_off <= 1; x_off++) {
+            arduboy.drawBitmap(x + x_off, y + y_off, sprite, 8, 8, !color);
+        }
+    }
+
+    arduboy.drawBitmap(x, y, sprite, 8, 8, color);
+}
+
 class Chess {
     Board board;
     game_state_t state;
@@ -556,7 +583,6 @@ public:
     }
 
 private:
-
     void receive_input() {
         switch (state.which) {
             case SELECT: {
@@ -589,11 +615,24 @@ private:
                         color_t current_player = state.as.move.player;
                         color_t new_player = !current_player;
 
-                        // test for checkmate
                         if (board.is_check(new_player) && board.is_checkmate(new_player)) {
+                            // move results in checkmate for next player
                             state.which = CHECKMATE;
                             state.as.checkmate.winner = current_player;
+                        } else if (current_player == WHITE && cursor.y() == 0 && board.square(cursor).rank() == PAWN) {
+                            // white pawn promotion
+                            state.which = PROMOTE;
+                            state.as.promote.player = WHITE;
+                            state.as.promote.piece = cursor;
+                            state.as.promote.choice = 0;
+                        } else if (current_player == BLACK && cursor.y() == 7 && board.square(cursor).rank() == PAWN) {
+                            // black pawn promotion
+                            state.which = PROMOTE;
+                            state.as.promote.player = BLACK;
+                            state.as.promote.piece = cursor;
+                            state.as.promote.choice = 0;
                         } else {
+                            // normal move
                             Coords new_cursor = first_selection_for_player(new_player);
                             state.which = SELECT;
                             state.as.select.player = new_player;
@@ -611,6 +650,40 @@ private:
             }
             case CHECKMATE: {
                 // ignore input
+                break;
+            }
+            case PROMOTE: {
+                if (buttons.justPressed(LEFT_BUTTON)) {
+                    if (state.as.promote.choice > 0) {
+                        state.as.promote.choice--;
+                    }
+                }
+
+                if (buttons.justPressed(RIGHT_BUTTON)) {
+                    if (state.as.promote.choice < 3) {
+                        state.as.promote.choice++;
+                    }
+                }
+
+                if (buttons.justPressed(A_BUTTON)) {
+                    color_t current_player = state.as.promote.player;
+                    Piece piece = Piece(current_player, PROMOTION_CHOICES[state.as.promote.choice]);
+                    Board new_board = board.set_square(state.as.promote.piece, piece);
+                    board = new_board;
+
+                    color_t new_player = !current_player;
+
+                    if (board.is_check(new_player) && board.is_checkmate(new_player)) {
+                        state.which = CHECKMATE;
+                        state.as.checkmate.winner = current_player;
+                    } else {
+                        Coords new_cursor = first_selection_for_player(new_player);
+                        state.which = SELECT;
+                        state.as.select.player = new_player;
+                        state.as.select.cursor = new_cursor;
+                    }
+                }
+
                 break;
             }
         }
@@ -638,7 +711,7 @@ private:
             }
         }
 
-        // should never happen, TODO panic
+        panic("first_selection_for_player");
     }
 
     void render() {
@@ -692,6 +765,31 @@ private:
                 }
                 return;
             }
+            case PROMOTE: {
+                int w = 96;
+                int h = 28;
+                int x = (128 - w) / 2;
+                int y = (64 - h) / 2;
+
+                // show promote modal
+                arduboy.drawRect(x - 1, y - 1, w + 2, h + 2, WHITE);
+                arduboy.fillRect(x, y, w, h, BLACK);
+                arduboy.setCursor(x + 7, y + 4);
+                if (state.as.promote.player == WHITE) {
+                    arduboy.print("White promote:");
+                } else {
+                    arduboy.print("Black promote:");
+                }
+
+                for (uint8_t i = 0; i < 4; i++) {
+                    draw_piece(i * 12 + 42, y + 16, PROMOTION_CHOICES[i], state.as.promote.player);
+                }
+
+                // show selection
+                int sel_x = state.as.promote.choice * 12 + 42;
+                int sel_y = y + 16;
+                arduboy.drawRect(sel_x - 1, sel_y - 1, 10, 10, frame_count);
+            }
         }
 
         if (current_player == WHITE) {
@@ -732,17 +830,9 @@ private:
             arduboy.drawBitmap(x, y, SQUARE_SPRITES[square_sprite_idx], 8, 8, 1);
         }
 
-        // draw outline in reverse colour
-        const uint8_t* sprite = RANK_SPRITES[piece.rank()];
-        for (int y_off = -1; y_off <= 1; y_off++) {
-            for (int x_off = -1; x_off <= 1; x_off++) {
-                arduboy.drawBitmap(x + x_off, y + y_off, sprite, 8, 8, !piece.color());
-            }
-        }
-
-        // draw sprite in piece colour
-        arduboy.drawBitmap(x, y, RANK_SPRITES[piece.rank()], 8, 8, piece.color());
+        draw_piece(x, y, piece.rank(), piece.color());
     }
+
 };
 
 Chess chess;
