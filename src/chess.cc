@@ -481,18 +481,24 @@ private:
 typedef enum {
     SELECT,
     MOVE,
+    CHECKMATE,
 } state_discriminant_t;
 
 typedef struct {
     state_discriminant_t which;
     union {
         struct {
+            color_t player;
             Coords cursor;
         } select;
         struct {
+            color_t player;
             Coords selected;
             Coords cursor;
         } move;
+        struct {
+            color_t winner;
+        } checkmate;
     } as;
 } game_state_t;
 
@@ -528,18 +534,19 @@ class Chess {
     Board board;
     game_state_t state;
     bool frame_count;
-    color_t current_player;
 
 public:
     Chess()
         : state({
             .which = SELECT,
             .as = {
-                .select = { .cursor = Coords(0, 6) },
+                .select = {
+                    .player = WHITE,
+                    .cursor = Coords(0, 6),
+                },
             },
         })
         , frame_count(false)
-        , current_player(WHITE)
     {}
 
     void loop() {
@@ -549,6 +556,7 @@ public:
     }
 
 private:
+
     void receive_input() {
         switch (state.which) {
             case SELECT: {
@@ -557,8 +565,9 @@ private:
                 if (buttons.justPressed(A_BUTTON)) {
                     Coords cursor = state.as.select.cursor;
 
-                    if (board.square(cursor).color() == current_player) {
+                    if (board.square(cursor).color() == state.as.select.player) {
                         state.which = MOVE;
+                        state.as.move.player = state.as.select.player;
                         state.as.move.selected = cursor;
                         state.as.move.cursor = cursor;
                     }
@@ -573,43 +582,58 @@ private:
                     Coords selected = state.as.move.selected;
                     Coords cursor = state.as.move.cursor;
 
-                    if (board.is_valid_turn(selected, cursor, current_player)) {
+                    if (board.is_valid_turn(selected, cursor, state.as.move.player)) {
                         Board new_board = board.move(selected, cursor);
                         board = new_board;
-                        next_player();
+
+                        color_t current_player = state.as.move.player;
+                        color_t new_player = !current_player;
+
+                        // test for checkmate
+                        if (board.is_check(new_player) && board.is_checkmate(new_player)) {
+                            state.which = CHECKMATE;
+                            state.as.checkmate.winner = current_player;
+                        } else {
+                            Coords new_cursor = first_selection_for_player(new_player);
+                            state.which = SELECT;
+                            state.as.select.player = new_player;
+                            state.as.select.cursor = new_cursor;
+                        }
                     }
                 } else if (buttons.justPressed(B_BUTTON)) {
                     Coords selected = state.as.move.selected;
                     state.which = SELECT;
+                    state.as.select.player = state.as.move.player;
                     state.as.select.cursor = selected;
                 }
 
                 break;
             }
+            case CHECKMATE: {
+                // ignore input
+                break;
+            }
         }
     }
 
-    void next_player() {
+    Coords first_selection_for_player(color_t player) {
         int y_begin, y_scale;
 
-        if (current_player == WHITE) {
-            current_player = BLACK;
-            y_begin = 0;
-            y_scale = 1;
-        } else {
-            current_player = WHITE;
+        if (player == WHITE) {
             y_begin = 7;
             y_scale = -1;
+        } else {
+            y_begin = 0;
+            y_scale = 1;
         }
 
         for (int i = 0; i < 8; i++) {
             int y = y_begin + i * y_scale;
             for (int x = 0; x < 8; x++) {
-                const Piece piece = board.square(Coords(x, y));
-                if (piece && piece.color() == current_player) {
-                    state.which = SELECT;
-                    state.as.select.cursor = Coords(x, y);
-                    return;
+                Coords coords = Coords(x, y);
+                Piece piece = board.square(coords);
+                if (piece && piece.color() == player) {
+                    return coords;
                 }
             }
         }
@@ -624,39 +648,20 @@ private:
             }
         }
 
-        bool in_check = board.is_check(current_player);
+        color_t current_player;
 
-        if (in_check) {
-            if (board.is_checkmate(current_player)) {
-                int w = 72;
-                int h = 28;
-                int x = (128 - w) / 2;
-                int y = (64 - h) / 2;
-
-                // show game over modal
-                arduboy.drawRect(x - 1, y - 1, w + 2, h + 2, WHITE);
-                arduboy.fillRect(x, y, w, h, BLACK);
-                arduboy.setCursor(x + 7, y + 4);
-                arduboy.print("Checkmate!");
-                arduboy.setCursor(x + 7, y + 16);
-                if (current_player == WHITE) {
-                    arduboy.print("Black wins");
-                } else {
-                    arduboy.print("White wins");
-                }
-                return;
-            }
-        }
-
-        // draw selection
         switch (state.which) {
             case SELECT: {
+                current_player = state.as.select.player;
+
                 int x = state.as.select.cursor.x() * 8 + 32;
                 int y = state.as.select.cursor.y() * 8;
                 arduboy.drawRect(x - 1, y - 1, 10, 10, frame_count);
                 break;
             }
             case MOVE: {
+                current_player = state.as.move.player;
+
                 int x = state.as.move.selected.x() * 8 + 32;
                 int y = state.as.move.selected.y() * 8;
                 arduboy.drawRect(x - 1, y - 1, 10, 10, WHITE);
@@ -668,13 +673,32 @@ private:
                 }
                 break;
             }
+            case CHECKMATE: {
+                int w = 72;
+                int h = 28;
+                int x = (128 - w) / 2;
+                int y = (64 - h) / 2;
+
+                // show game over modal
+                arduboy.drawRect(x - 1, y - 1, w + 2, h + 2, WHITE);
+                arduboy.fillRect(x, y, w, h, BLACK);
+                arduboy.setCursor(x + 7, y + 4);
+                arduboy.print("Checkmate!");
+                arduboy.setCursor(x + 7, y + 16);
+                if (state.as.checkmate.winner == WHITE) {
+                    arduboy.print("White wins");
+                } else {
+                    arduboy.print("Black wins");
+                }
+                return;
+            }
         }
 
         if (current_player == WHITE) {
             arduboy.setCursor(0, 64 - 8);
             arduboy.print("White");
 
-            if (in_check) {
+            if (board.is_check(WHITE)) {
                 arduboy.setCursor(0, 64 - 16);
                 arduboy.print("CHECK");
             }
@@ -682,7 +706,7 @@ private:
             arduboy.setCursor(0, 0);
             arduboy.print("Black");
 
-            if (in_check) {
+            if (board.is_check(BLACK)) {
                 arduboy.setCursor(0, 8);
                 arduboy.print("CHECK");
             }
@@ -703,7 +727,7 @@ private:
         };
 
         // draw square, but only if a valid move target in move mode
-        if (state.which != MOVE || board.is_valid_turn(state.as.move.selected, square, current_player)) {
+        if (state.which != MOVE || board.is_valid_turn(state.as.move.selected, square, state.as.move.player)) {
             int square_sprite_idx = ~(square.x() ^ square.y()) & 1;
             arduboy.drawBitmap(x, y, SQUARE_SPRITES[square_sprite_idx], 8, 8, 1);
         }
